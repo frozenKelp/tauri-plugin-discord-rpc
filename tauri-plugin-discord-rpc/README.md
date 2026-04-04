@@ -1,1 +1,0 @@
-# Tauri Plugin discord-rpc
