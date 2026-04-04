@@ -31,12 +31,28 @@ tauri::Builder::default()
     .expect("error while running tauri application");
 ```
 
-Add the permission to `src-tauri/capabilities/default.json`:
+Add the permissions to `src-tauri/capabilities/default.json`.
+
+To allow all commands (recommended):
 
 ```json
 {
   "permissions": [
     "discord-rpc:default"
+  ]
+}
+```
+
+Or grant individual permissions:
+
+```json
+{
+  "permissions": [
+    "discord-rpc:allow-connect",
+    "discord-rpc:allow-disconnect",
+    "discord-rpc:allow-set-activity",
+    "discord-rpc:allow-clear-activity",
+    "discord-rpc:allow-is-running"
   ]
 }
 ```
@@ -108,56 +124,46 @@ await disconnect();
 
 ## API Reference
 
-### `connect(appId: string): Promise<void>`
+#### `connect(appId: string): Promise<void>`
 Connects to the Discord client using the given application ID.
 
-### `disconnect(): Promise<void>`
+#### `disconnect(): Promise<void>`
 Disconnects from the Discord client and clears any active presence.
 
-### `setActivity(activity: Activity): Promise<void>`
-Sets the current Rich Presence activity.
-
-### `clearActivity(): Promise<void>`
-Clears the current Rich Presence activity without disconnecting.
-
-### `isRunning(): Promise<boolean>`
-Returns `true` if Discord is currently running on the system.
-
-### Types
+#### `setActivity(activity: Activity): Promise<void>`
+Sets the current Rich Presence activity. All fields are optional.
 
 ```ts
 interface Activity {
-  state?: string
-  details?: string
-  assets?: Assets
-  buttons?: Button[]
-  party?: Party
-  timestamps?: Timestamps
-}
-
-interface Assets {
-  largeImage?: string
-  largeText?: string
-  smallImage?: string
-  smallText?: string
-}
-
-interface Button {
-  label: string
-  url: string
-}
-
-interface Party {
-  id?: string
-  currentSize?: number
-  maxSize?: number
-}
-
-interface Timestamps {
-  start?: number
-  end?: number
+  details?:    string       // top line of the presence
+  state?:      string       // second line
+  timestamps?: {
+    start?: number          // epoch ms — shows elapsed time
+    end?:   number          // epoch ms — shows remaining time
+  }
+  assets?: {
+    largeImage?: string     // art asset key or https:// URL
+    largeText?:  string     // tooltip on hover
+    smallImage?: string
+    smallText?:  string
+  }
+  buttons?: Array<{
+    label: string           // max 32 chars
+    url:   string           // must be https://
+  }>                        // max 2 buttons
+  party?: {
+    id?:          string
+    currentSize?: number
+    maxSize?:     number
+  }
 }
 ```
+
+#### `clearActivity(): Promise<void>`
+Clears the current Rich Presence activity without disconnecting.
+
+#### `isRunning(): Promise<boolean>`
+Returns `true` if Discord is currently running on the system.
 
 ## Requirements
 
