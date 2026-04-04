@@ -1,6 +1,6 @@
 # tauri-plugin-discord-rpc
 
-Discord Rich Presence plugin for Tauri v2.
+Discord Rich Presence plugin for Tauri v2. Supports setting activity, timestamps, assets, buttons, and party info.
 
 ## Installation
 
@@ -16,6 +16,8 @@ tauri-plugin-discord-rpc = { git = "https://github.com/Youwes09/tauri-plugin-dis
 
 ```bash
 pnpm add github:Youwes09/tauri-plugin-discord-rpc
+# or
+npm install github:Youwes09/tauri-plugin-discord-rpc
 ```
 
 ## Setup
@@ -42,26 +44,126 @@ Add the permission to `src-tauri/capabilities/default.json`:
 ## Usage
 
 ```ts
-import { connect, disconnect, setActivity, clearActivity } from "tauri-plugin-discord-rpc";
+import {
+  connect,
+  disconnect,
+  setActivity,
+  clearActivity,
+  isRunning,
+} from "tauri-plugin-discord-rpc-api";
+```
 
-// Connect to Discord
-await connect();
+### Connect
 
-// Set activity
+Connect to Discord using your application ID from the [Discord Developer Portal](https://discord.com/developers/applications).
+
+```ts
+await connect("your_app_id");
+```
+
+### Set Activity
+
+```ts
 await setActivity({
-  state: "Browsing",
   details: "Reading manga",
-  largeImageKey: "your-image-key",
+  state: "Chapter 42 · Reading",
+  timestamps: {
+    start: Date.now(),
+  },
+  assets: {
+    largeImage: "cover_image_key",
+    largeText: "My Manga Title",
+    smallImage: "app_logo_key",
+    smallText: "My App",
+  },
+  buttons: [
+    { label: "GitHub", url: "https://github.com/yourrepo" },
+    { label: "Discord", url: "https://discord.gg/yourinvite" },
+  ],
+  party: {
+    id: "optional_party_id",
+    currentSize: 1,
+    maxSize: 4,
+  },
 });
+```
 
-// Clear activity
+### Clear Activity
+
+```ts
 await clearActivity();
+```
 
-// Disconnect
+### Check if Discord is Running
+
+```ts
+const running = await isRunning(); // boolean
+```
+
+### Disconnect
+
+```ts
 await disconnect();
+```
+
+## API Reference
+
+### `connect(appId: string): Promise<void>`
+Connects to the Discord client using the given application ID.
+
+### `disconnect(): Promise<void>`
+Disconnects from the Discord client and clears any active presence.
+
+### `setActivity(activity: Activity): Promise<void>`
+Sets the current Rich Presence activity.
+
+### `clearActivity(): Promise<void>`
+Clears the current Rich Presence activity without disconnecting.
+
+### `isRunning(): Promise<boolean>`
+Returns `true` if Discord is currently running on the system.
+
+### Types
+
+```ts
+interface Activity {
+  state?: string
+  details?: string
+  assets?: Assets
+  buttons?: Button[]
+  party?: Party
+  timestamps?: Timestamps
+}
+
+interface Assets {
+  largeImage?: string
+  largeText?: string
+  smallImage?: string
+  smallText?: string
+}
+
+interface Button {
+  label: string
+  url: string
+}
+
+interface Party {
+  id?: string
+  currentSize?: number
+  maxSize?: number
+}
+
+interface Timestamps {
+  start?: number
+  end?: number
+}
 ```
 
 ## Requirements
 
 - Tauri v2
 - Discord desktop app running on the user's machine
+
+## Credits
+
+Developed by [Youwes09](https://github.com/Youwes09), with assistance from [Claude](https://claude.ai) (Anthropic) for core development, debugging, and logic design.
