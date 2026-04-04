@@ -1,0 +1,9 @@
+[default]
+description = "Default permissions for the plugin"
+permissions = [
+  "allow-connect",
+  "allow-disconnect",
+  "allow-set-activity",
+  "allow-clear-activity",
+  "allow-is-running",
+]
