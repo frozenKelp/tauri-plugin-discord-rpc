@@ -1,25 +1,27 @@
 # tauri-plugin-discord-rpc
 
-A Tauri v2 plugin for Discord Rich Presence. Wraps Discord's IPC socket with a clean async API, automatic reconnection, and real-time connection state pushed to the frontend.
+A Tauri v2 plugin for Discord Rich Presence. Handles connection, reconnection, and real-time status without any frontend polling.
 
 ## Features
 
-- Connect, disconnect, and set/clear Rich Presence from any Tauri app
-- Automatic reconnection when Discord restarts — no manual polling required
-- Real-time connection status via Tauri events (no frontend polling)
-- Heartbeat ping detects dropped connections within 500ms
-- Full activity support: state, details, timestamps, assets, buttons, party
+- Connect and disconnect from Discord's IPC socket
+- Set and clear Rich Presence with full activity support
+- Automatic reconnection when Discord restarts
+- Real-time connection state pushed to the frontend via events
+- 500ms heartbeat detects dropped connections instantly
+- Works on Windows, macOS, and Linux
 
 ## Installation
 
-Add the plugin to your `Cargo.toml`:
+### Rust
+
+Add the plugin to your `src-tauri/Cargo.toml`:
 
 ```toml
-[dependencies]
-tauri-plugin-discord-rpc = { path = "tauri-plugin-discord-rpc" }
+tauri-plugin-discord-rpc = { git = "https://github.com/Youwes09/tauri-plugin-discord-rpc" }
 ```
 
-Register it in your Tauri app:
+Register it in `src-tauri/src/lib.rs`:
 
 ```rust
 tauri::Builder::default()
@@ -28,30 +30,37 @@ tauri::Builder::default()
     .expect("error while running tauri application");
 ```
 
-Install the JS bindings:
+### JavaScript
+
+Install the guest bindings from the repo:
 
 ```bash
-npm install tauri-plugin-discord-rpc-api
+pnpm add /path/to/tauri-plugin-discord-rpc
+```
+
+Add the required permissions to your `capabilities/default.json`:
+
+```json
+"discord-rpc:default",
+"discord-rpc:allow-connect",
+"discord-rpc:allow-disconnect",
+"discord-rpc:allow-set-activity",
+"discord-rpc:allow-clear-activity",
+"discord-rpc:allow-is-running"
 ```
 
 ## Usage
 
-```js
-import {
-  connect,
-  disconnect,
-  setActivity,
-  clearActivity,
-  isRunning,
-} from 'tauri-plugin-discord-rpc-api'
+```ts
+import { connect, disconnect, setActivity, clearActivity, isRunning } from 'tauri-plugin-discord-rpc-api'
 import { listen } from '@tauri-apps/api/event'
 
-// Connect to Discord
+// Connect to Discord (blocks until IPC is open or throws)
 await connect('YOUR_APP_ID')
 
-// Listen for connection state changes (instant, no polling)
+// Listen for real-time connection state changes
 const unlisten = await listen('discord-rpc://running', ({ payload }) => {
-  console.log('Discord connected:', payload)
+  console.log('Discord connected:', payload) // true | false
 })
 
 // Set presence
@@ -59,7 +68,13 @@ await setActivity({
   details: 'Building something',
   state: 'In the zone',
   timestamps: { start: Date.now() },
-  buttons: [{ label: 'GitHub', url: 'https://github.com' }],
+  assets: {
+    largeImage: 'my_image_key',
+    largeText: 'My App',
+  },
+  buttons: [
+    { label: 'GitHub', url: 'https://github.com' },
+  ],
 })
 
 // Clear presence
@@ -67,6 +82,9 @@ await clearActivity()
 
 // Disconnect
 await disconnect()
+
+// Clean up listener
+unlisten()
 ```
 
 ## Activity Schema
@@ -75,14 +93,20 @@ await disconnect()
 interface Activity {
   state?:      string
   details?:    string
-  timestamps?: { start?: number; end?: number }
+  timestamps?: {
+    start?: number
+    end?:   number
+  }
   assets?: {
     largeImage?: string
     largeText?:  string
     smallImage?: string
     smallText?:  string
   }
-  buttons?: Array<{ label: string; url: string }>
+  buttons?: Array<{
+    label: string
+    url:   string
+  }>
   party?: {
     id?:          string
     currentSize?: number
@@ -93,16 +117,16 @@ interface Activity {
 
 ## How It Works
 
-The plugin spawns a background worker that owns the Discord IPC socket. Commands (`setActivity`, `clearActivity`) are sent to the worker via an async channel. If a send fails, the worker attempts a cheap reconnect on the same thread before falling back to a full reconnect loop. A 500ms heartbeat pings the socket continuously so dropped connections are caught quickly regardless of activity. Connection state changes are emitted as `discord-rpc://running` events the moment they happen.
+The plugin spawns a background worker that owns the Discord IPC socket. Commands are sent to it via an async channel. If a send fails, it attempts a cheap reconnect before falling back to a full reconnect loop. A 500ms heartbeat pings the socket so dropped connections are detected quickly even when no activity is being set. Connection state changes are emitted as `discord-rpc://running` events the moment they happen — no polling required on the frontend.
 
 ## Platform Support
 
-| Platform | Status  |
-|----------|---------|
-| Windows  | ✅      |
-| macOS    | ✅      |
-| Linux    | ✅      |
-| Mobile   | ❌      |
+| Platform | Status |
+|----------|--------|
+| Windows  | ✅     |
+| macOS    | ✅     |
+| Linux    | ✅     |
+| Mobile   | ❌     |
 
 ## License
 
