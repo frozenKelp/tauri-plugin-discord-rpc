@@ -57,23 +57,15 @@ impl<R: Runtime> DiscordRpc<R> {
     let running_tx           = self.running_tx.clone();
     let app                  = self.app.clone();
 
+    // Awaiting the real socket would leave connect() pending forever while Discord is closed,
+    // if Discord is opened after launch presence wouldnt show.
+    // keep the worker retrying in the background, 
+    // wire the command channel up now so activity sent before it connects isn't lost.
+    *self.cmd_tx.lock().await = Some(cmd_tx);
     *handle_guard = Some(tokio::spawn(worker(app, app_id, cmd_rx, running_tx, ready_tx)));
     drop(handle_guard);
 
-    match ready_rx.await {
-      Ok(Ok(())) => {
-        *self.cmd_tx.lock().await = Some(cmd_tx);
-        Ok(())
-      }
-      Ok(Err(e)) => {
-        self.handle.lock().await.take();
-        Err(e)
-      }
-      Err(_) => {
-        self.handle.lock().await.take();
-        Err(Error::NotConnected)
-      }
-    }
+    ready_rx.await.unwrap_or(Err(Error::NotConnected))
   }
 
   pub async fn disconnect(&self) -> Result<()> {
@@ -112,17 +104,17 @@ impl<R: Runtime> DiscordRpc<R> {
 async fn reconnect_and_restore(
   app_id:   &str,
   cmd_rx:   &mut mpsc::UnboundedReceiver<Cmd>,
-  last_cmd: &Option<Cmd>,
+  last_cmd: &mut Option<Cmd>,
   emit:     &impl Fn(bool),
 ) -> Option<DiscordIpcClient> {
-  match connect_loop(app_id, cmd_rx).await {
+  match connect_loop(app_id, cmd_rx, last_cmd).await {
     None => {
       emit(false);
       None
     }
     Some(mut c) => {
       emit(true);
-      if let Some(lc) = last_cmd {
+      if let Some(lc) = last_cmd.as_ref() {
         let (nc, _) = tokio::task::spawn_blocking({
           let lc = lc.clone();
           move || {
@@ -155,19 +147,38 @@ async fn worker<R: Runtime>(
     let _ = app.emit("discord-rpc://running", val);
   };
 
-  let mut client = match connect_loop(&app_id, &mut cmd_rx).await {
-    Some(c) => c,
-    None => {
-      let _ = ready_tx.send(Err(Error::NotConnected));
-      emit(false);
-      return;
-    }
+  // Report first attempt , looping here leaves connect() pending.
+  let first = {
+    let id = app_id.clone();
+    tokio::task::spawn_blocking(move || {
+      let mut c = DiscordIpcClient::new(&id);
+      c.connect().map(|_| c)
+    })
+    .await
+    .ok()
+    .and_then(|r| r.ok())
   };
 
-  emit(true);
-  let _ = ready_tx.send(Ok(()));
-
   let mut last_cmd: Option<Cmd> = None;
+
+  let mut client = match first {
+    Some(c) => {
+      emit(true);
+      let _ = ready_tx.send(Ok(()));
+      c
+    }
+    None => {
+      // keep retrying so opening Discord later attaches presence without a restart.
+      // forward "not connected", so it isn't left waiting.
+      emit(false);
+      let _ = ready_tx.send(Err(Error::NotConnected));
+      // Reuse the reconnect path: it collapses the backlog and shows the latest presence on connect.
+      match reconnect_and_restore(&app_id, &mut cmd_rx, &mut last_cmd, &emit).await {
+        Some(c) => c,
+        None    => return,
+      }
+    }
+  };
 
   loop {
     tokio::select! {
@@ -222,7 +233,7 @@ async fn worker<R: Runtime>(
           Outcome::NeedsFullReconnect(c) => {
             drop(c);
             emit(false);
-            match reconnect_and_restore(&app_id, &mut cmd_rx, &last_cmd, &emit).await {
+            match reconnect_and_restore(&app_id, &mut cmd_rx, &mut last_cmd, &emit).await {
               Some(c) => client = c,
               None    => return,
             }
@@ -246,7 +257,7 @@ async fn worker<R: Runtime>(
 
         if !alive {
           emit(false);
-          match reconnect_and_restore(&app_id, &mut cmd_rx, &last_cmd, &emit).await {
+          match reconnect_and_restore(&app_id, &mut cmd_rx, &mut last_cmd, &emit).await {
             Some(c) => client = c,
             None    => return,
           }
@@ -257,12 +268,22 @@ async fn worker<R: Runtime>(
 }
 
 async fn connect_loop(
-  app_id: &str,
-  cmd_rx: &mut mpsc::UnboundedReceiver<Cmd>,
+  app_id:   &str,
+  cmd_rx:   &mut mpsc::UnboundedReceiver<Cmd>,
+  last_cmd: &mut Option<Cmd>,
 ) -> Option<DiscordIpcClient> {
   loop {
+    // Shutdown is signalled by disconnect() dropping the command sender, which closes the channel.
     if cmd_rx.is_closed() {
       return None;
+    }
+
+    // Only the most recent presence matters, so collapse anything queued while we're down to just
+    // the latest — otherwise the unbounded channel grows for the whole disconnected period (e.g.
+    // reading with Discord closed). The latest is applied on connect. We must NOT exit on a command
+    // here — an earlier version did, killing the worker mid-reconnect; we only remember it.
+    while let Ok(c) = cmd_rx.try_recv() {
+      *last_cmd = Some(c);
     }
 
     let id = app_id.to_owned();
@@ -273,12 +294,7 @@ async fn connect_loop(
     .await
     {
       Ok(Ok(c)) => return Some(c),
-      _ => {
-        tokio::select! {
-          _ = sleep(RECONNECT_DELAY) => {}
-          _ = cmd_rx.recv() => return None,
-        }
-      }
+      _ => sleep(RECONNECT_DELAY).await,
     }
   }
 }
