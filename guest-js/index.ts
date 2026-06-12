@@ -30,6 +30,10 @@ export interface Activity {
   buttons?: Button[]
   party?: Party
   timestamps?: Timestamps
+  /** 0 Playing, 2 Listening, 3 Watching, 5 Competing. */
+  activityType?: number
+  /** 0 Name, 1 State, 2 Details — compact headline. */
+  statusDisplayType?: number
 }
 
 export async function connect(appId: string): Promise<void> {

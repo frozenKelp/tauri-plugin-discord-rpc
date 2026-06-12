@@ -270,6 +270,22 @@ fn build_activity(payload: &Activity) -> activity::Activity<'_> {
   if let Some(s) = &payload.state   { act = act.state(s); }
   if let Some(d) = &payload.details { act = act.details(d); }
 
+  if let Some(t) = payload.activity_type {
+    act = act.activity_type(match t {
+      2 => activity::ActivityType::Listening,
+      3 => activity::ActivityType::Watching,
+      5 => activity::ActivityType::Competing,
+      _ => activity::ActivityType::Playing,
+    });
+  }
+  if let Some(d) = payload.status_display_type {
+    act = act.status_display_type(match d {
+      1 => activity::StatusDisplayType::State,
+      2 => activity::StatusDisplayType::Details,
+      _ => activity::StatusDisplayType::Name,
+    });
+  }
+
   if let Some(ts) = &payload.timestamps {
     let mut t = activity::Timestamps::new();
     if let Some(v) = ts.start { t = t.start(v); }

@@ -40,4 +40,8 @@ pub struct Activity {
   pub buttons: Option<Vec<Button>>,
   pub party: Option<Party>,
   pub timestamps: Option<Timestamps>,
+  // 0 Playing, 2 Listening, 3 Watching, 5 Competing
+  pub activity_type: Option<u8>,
+  // 0 Name, 1 State, 2 Details — compact headline.
+  pub status_display_type: Option<u8>,
 }
