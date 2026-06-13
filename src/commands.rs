@@ -22,6 +22,13 @@ pub(crate) async fn clear_activity<R: Runtime>(app: AppHandle<R>) -> Result<()> 
 }
 
 #[command]
-pub(crate) async fn is_running<R: Runtime>(app: AppHandle<R>) -> bool {
-  app.discord_rpc().is_running().await
+pub(crate) async fn is_connected<R: Runtime>(app: AppHandle<R>) -> bool {
+  app.discord_rpc().is_connected().await
+}
+
+#[command]
+pub(crate) async fn get_current_user<R: Runtime>(
+  app: AppHandle<R>,
+) -> Option<crate::models::User> {
+  app.discord_rpc().get_current_user().await
 }

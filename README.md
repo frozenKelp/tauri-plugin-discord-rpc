@@ -52,7 +52,8 @@ Or grant individual permissions:
     "discord-rpc:allow-disconnect",
     "discord-rpc:allow-set-activity",
     "discord-rpc:allow-clear-activity",
-    "discord-rpc:allow-is-running"
+    "discord-rpc:allow-is-connected",
+    "discord-rpc:allow-get-current-user"
   ]
 }
 ```
@@ -65,7 +66,8 @@ import {
   disconnect,
   setActivity,
   clearActivity,
-  isRunning,
+  isConnected,
+  getCurrentUser,
 } from "tauri-plugin-discord-rpc-api";
 ```
 
@@ -110,10 +112,16 @@ await setActivity({
 await clearActivity();
 ```
 
-### Check if Discord is Running
+### Check if Connected
 
 ```ts
-const running = await isRunning(); // boolean
+const connected = await isConnected(); // boolean — is the RPC link to Discord live?
+```
+
+### Get the Logged-in User
+
+```ts
+const user = await getCurrentUser(); // User | null
 ```
 
 ### Disconnect
@@ -137,6 +145,8 @@ Sets the current Rich Presence activity. All fields are optional.
 interface Activity {
   details?:    string       // top line of the presence
   state?:      string       // second line
+  detailsUrl?: string       // makes the details line a clickable link
+  stateUrl?:   string       // makes the state line a clickable link
   timestamps?: {
     start?: number          // epoch ms — shows elapsed time
     end?:   number          // epoch ms — shows remaining time
@@ -162,8 +172,46 @@ interface Activity {
 #### `clearActivity(): Promise<void>`
 Clears the current Rich Presence activity without disconnecting.
 
-#### `isRunning(): Promise<boolean>`
-Returns `true` if Discord is currently running on the system.
+#### `isConnected(): Promise<boolean>`
+Returns `true` while the RPC connection to Discord is live (not whether a Discord process
+merely exists on the system).
+
+#### `getCurrentUser(): Promise<User | null>`
+Returns the logged-in Discord user captured from the `READY` handshake, or `null` if not
+connected.
+
+```ts
+interface User {
+  id:             string
+  username:       string
+  discriminator?: string
+  globalName?:    string
+  avatar?:        string   // avatar hash
+}
+```
+
+### Events
+
+The plugin emits these events (listen via `@tauri-apps/api/event`):
+
+| Event | Payload | When |
+|-------|---------|------|
+| `discord-rpc://connected` | `boolean` | Connection comes up (`true`) or drops (`false`). |
+| `discord-rpc://ready`     | `User`    | Right after a successful handshake — carries the logged-in user. |
+| `discord-rpc://error`     | `string`  | Discord rejected a presence update; payload is its message. The connection stays up. |
+
+> **Note on the activity name:** there is intentionally no `name` field. Per Discord's
+> guidelines the activity name is fixed to your registered application's name and cannot be
+> overridden via RPC.
+
+## Migration
+
+- `isRunning()` → **`isConnected()`** (same return type; clearer meaning).
+- Permission `discord-rpc:allow-is-running` → **`discord-rpc:allow-is-connected`**, and add
+  `discord-rpc:allow-get-current-user` if you grant permissions individually.
+- New, additive: the `discord-rpc://ready` / `discord-rpc://error` events and
+  `getCurrentUser()`. `setActivity()` keeps its resolve-on-accept contract; watch the
+  `error` event to learn when Discord rejects an update.
 
 ## Requirements
 

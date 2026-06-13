@@ -23,9 +23,21 @@ export interface Timestamps {
   end?: number
 }
 
+export interface User {
+  id: string
+  username: string
+  discriminator?: string
+  globalName?: string
+  avatar?: string
+}
+
 export interface Activity {
   state?: string
   details?: string
+  /** Makes the state line a clickable link. */
+  stateUrl?: string
+  /** Makes the details line a clickable link. */
+  detailsUrl?: string
   assets?: Assets
   buttons?: Button[]
   party?: Party
@@ -52,6 +64,10 @@ export async function clearActivity(): Promise<void> {
   await invoke('plugin:discord-rpc|clear_activity')
 }
 
-export async function isRunning(): Promise<boolean> {
-  return await invoke('plugin:discord-rpc|is_running')
+export async function isConnected(): Promise<boolean> {
+  return await invoke('plugin:discord-rpc|is_connected')
+}
+
+export async function getCurrentUser(): Promise<User | null> {
+  return await invoke('plugin:discord-rpc|get_current_user')
 }

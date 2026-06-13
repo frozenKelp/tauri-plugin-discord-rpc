@@ -16,8 +16,6 @@ thiserror = "2"
 discord-rich-presence = "1.1.0"
 tokio = { version = "1", features = ["sync", "time", "rt", "macros"] }
 log = "0.4"
-sysinfo = { version = "0.36.1", default-features = false, features = ["system"] }
-libc = "0.2.184"
 
 [build-dependencies]
 tauri-plugin = { version = "2.5.4", features = ["build"] }

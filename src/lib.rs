@@ -35,7 +35,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
       commands::disconnect,
       commands::set_activity,
       commands::clear_activity,
-      commands::is_running,
+      commands::is_connected,
+      commands::get_current_user,
     ])
     .setup(|app, api| {
       #[cfg(mobile)]
