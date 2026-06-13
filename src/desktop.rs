@@ -155,14 +155,6 @@ impl<R: Runtime> DiscordRpc<R> {
   }
 }
 
-// TEMP debug : wall-clock ms for timing the reconnect path.
-fn ts() -> u128 {
-  std::time::SystemTime::now()
-    .duration_since(std::time::UNIX_EPOCH)
-    .map(|d| d.as_millis())
-    .unwrap_or(0)
-}
-
 // Apply one command, then READ Discord's echoed response (lock-step). Blocking → blocking thread.
 async fn apply(client: DiscordIpcClient, cmd: Cmd) -> (DiscordIpcClient, Outcome) {
   tokio::task::spawn_blocking(move || {
@@ -213,7 +205,6 @@ async fn reconnect_and_restore<R: Runtime>(
   };
   ev.connected(true);
   ev.ready(&user);
-  eprintln!("[drpc-recon] {} reconnected (handshake READY) — restoring presence", ts()); // TEMP debug
 
   // Re-assert presence — watch holds it. borrow_and_update marks it
   // seen so the main loop's changed() won't immediately re-apply the very same value.
@@ -221,14 +212,12 @@ async fn reconnect_and_restore<R: Runtime>(
   match latest {
     Some(cmd) => {
       let (c, outcome) = apply(client, cmd).await;
-      let label = match &outcome { Outcome::Ok => "Ok", Outcome::Rejected(_) => "Rejected", Outcome::Dead => "Dead" };
-      eprintln!("[drpc-recon] {} restore apply outcome: {}", ts(), label); // TEMP debug
       if let Outcome::Rejected(msg) = &outcome {
         ev.error(msg);
       }
       Some(c) // if Dead, the main loop's next ping reconnects again
     }
-    None => { eprintln!("[drpc-recon] {} nothing to restore", ts()); Some(client) } // TEMP debug
+    None => Some(client),
   }
 }
 
@@ -291,7 +280,6 @@ async fn worker<R: Runtime>(
           Outcome::Ok            => client = c,
           Outcome::Rejected(msg) => { ev.error(&msg); client = c; } // stay connected
           Outcome::Dead          => {
-            eprintln!("[drpc-recon] {} pipe DEAD (on set/clear) — reconnecting", ts()); // TEMP debug
             drop(c);
             ev.connected(false);
             match reconnect_and_restore(&app_id, &mut cmd_rx, &ev).await {
@@ -310,13 +298,11 @@ async fn worker<R: Runtime>(
         let (c, outcome) = match latest {
           Some(cmd) => {
             reassert -= 1;
-            eprintln!("[drpc-recon] {} re-assert presence ({} ticks left)", ts(), reassert); // TEMP debug
             apply(client, cmd).await
           }
           None => ping(client).await,
         };
         if outcome == Outcome::Dead {
-          eprintln!("[drpc-recon] {} pipe DEAD (liveness) — reconnecting", ts()); // TEMP debug
           drop(c);
           ev.connected(false);
           match reconnect_and_restore(&app_id, &mut cmd_rx, &ev).await {
@@ -343,13 +329,10 @@ async fn connect_loop(
     }
 
     let id = app_id.to_owned();
-    eprintln!("[drpc-recon] {} handshake attempt {}", ts(), attempt); // TEMP debug
     match tokio::task::spawn_blocking(move || handshake(&id)).await {
-      Ok(Ok(pair)) => { eprintln!("[drpc-recon] {} handshake OK (attempt {})", ts(), attempt); return Some(pair); } // TEMP debug
+      Ok(Ok(pair)) => return Some(pair),
       _ => {
-        let d = backoff_delay(attempt);
-        eprintln!("[drpc-recon] {} handshake FAIL (attempt {}) -> sleep {}ms", ts(), attempt, d.as_millis()); // TEMP debug
-        sleep(d).await;
+        sleep(backoff_delay(attempt)).await;
         attempt = attempt.saturating_add(1);
       }
     }
