@@ -5,8 +5,10 @@ use serde::{Deserialize, Serialize};
 pub struct Assets {
   pub large_image: Option<String>,
   pub large_text: Option<String>,
+  pub large_url: Option<String>,
   pub small_image: Option<String>,
   pub small_text: Option<String>,
+  pub small_url: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -44,6 +46,7 @@ pub struct User {
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct Activity {
+  pub name: Option<String>,
   pub state: Option<String>,
   pub details: Option<String>,
   pub state_url: Option<String>,

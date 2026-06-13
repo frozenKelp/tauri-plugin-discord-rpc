@@ -326,6 +326,7 @@ async fn connect_loop(
 fn build_activity(payload: &Activity) -> activity::Activity<'_> {
   let mut act = activity::Activity::new();
 
+  if let Some(n) = &payload.name        { act = act.name(n); }
   if let Some(s) = &payload.state       { act = act.state(s); }
   if let Some(u) = &payload.state_url   { act = act.state_url(u); }
   if let Some(d) = &payload.details     { act = act.details(d); }
@@ -358,8 +359,10 @@ fn build_activity(payload: &Activity) -> activity::Activity<'_> {
     let mut a = activity::Assets::new();
     if let Some(v) = &assets.large_image { a = a.large_image(v); }
     if let Some(v) = &assets.large_text  { a = a.large_text(v); }
+    if let Some(v) = &assets.large_url   { a = a.large_url(v); }
     if let Some(v) = &assets.small_image { a = a.small_image(v); }
     if let Some(v) = &assets.small_text  { a = a.small_text(v); }
+    if let Some(v) = &assets.small_url   { a = a.small_url(v); }
     act = act.assets(a);
   }
 

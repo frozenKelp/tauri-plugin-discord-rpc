@@ -3,8 +3,12 @@ import { invoke } from '@tauri-apps/api/core'
 export interface Assets {
   largeImage?: string
   largeText?: string
+  /** Makes the large image a clickable link. */
+  largeUrl?: string
   smallImage?: string
   smallText?: string
+  /** Makes the small image a clickable link. */
+  smallUrl?: string
 }
 
 export interface Button {
@@ -32,6 +36,8 @@ export interface User {
 }
 
 export interface Activity {
+  /** Activity name. Discord may substitute the registered app name for an app RPC. */
+  name?: string
   state?: string
   details?: string
   /** Makes the state line a clickable link. */
