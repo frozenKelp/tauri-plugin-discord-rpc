@@ -16,6 +16,12 @@ use crate::error::{Error, Result};
 // that idle presence reappears promptly, while still being a tiny ping (not the old 500ms activity
 // resend). An active write (a presence change) detects a dead pipe immediately on its own.
 const LIVENESS:        Duration = Duration::from_secs(2);
+// After a (re)connect, re-assert full presence
+// Discord will accept set_activity right after restart, return Ok, and trash it to god knows where without RENDERING it.
+// it only renders activity when its ready.
+// re-sending makes the presence actually appear. 
+// 4 ticks × LIVENESS(2s) ≈ 8s window.
+const REASSERT_TICKS:  u32      = 2;
 
 #[derive(Clone, Debug)]
 enum Cmd {
@@ -57,8 +63,7 @@ impl<R: Runtime> Events<'_, R> {
 
 pub struct DiscordRpc<R: Runtime> {
   app:        AppHandle<R>,
-  // watch (not a queue): only the latest presence ever matters, so a one-slot channel that
-  // overwrites is the right shape — it can never back up, and the worker always sees the newest.
+  // watch : only the latest presence ever matters, so a one-slot channel suffices.
   cmd_tx:     Mutex<Option<watch::Sender<Option<Cmd>>>>,
   running_tx: watch::Sender<bool>,
   running_rx: watch::Receiver<bool>,
@@ -150,6 +155,14 @@ impl<R: Runtime> DiscordRpc<R> {
   }
 }
 
+// TEMP debug : wall-clock ms for timing the reconnect path.
+fn ts() -> u128 {
+  std::time::SystemTime::now()
+    .duration_since(std::time::UNIX_EPOCH)
+    .map(|d| d.as_millis())
+    .unwrap_or(0)
+}
+
 // Apply one command, then READ Discord's echoed response (lock-step). Blocking → blocking thread.
 async fn apply(client: DiscordIpcClient, cmd: Cmd) -> (DiscordIpcClient, Outcome) {
   tokio::task::spawn_blocking(move || {
@@ -200,19 +213,22 @@ async fn reconnect_and_restore<R: Runtime>(
   };
   ev.connected(true);
   ev.ready(&user);
+  eprintln!("[drpc-recon] {} reconnected (handshake READY) — restoring presence", ts()); // TEMP debug
 
-  // Re-assert the latest desired presence — the watch always holds it. borrow_and_update marks it
+  // Re-assert presence — watch holds it. borrow_and_update marks it
   // seen so the main loop's changed() won't immediately re-apply the very same value.
   let latest = cmd_rx.borrow_and_update().clone();
   match latest {
     Some(cmd) => {
       let (c, outcome) = apply(client, cmd).await;
+      let label = match &outcome { Outcome::Ok => "Ok", Outcome::Rejected(_) => "Rejected", Outcome::Dead => "Dead" };
+      eprintln!("[drpc-recon] {} restore apply outcome: {}", ts(), label); // TEMP debug
       if let Outcome::Rejected(msg) = &outcome {
         ev.error(msg);
       }
       Some(c) // if Dead, the main loop's next ping reconnects again
     }
-    None => Some(client),
+    None => { eprintln!("[drpc-recon] {} nothing to restore", ts()); Some(client) } // TEMP debug
   }
 }
 
@@ -225,6 +241,9 @@ async fn worker<R: Runtime>(
   ready_tx:   oneshot::Sender<Result<()>>,
 ) {
   let ev = Events { app: &app, running_tx: &running_tx, user_tx: &user_tx };
+
+  // Re-assert presence for a few liveness ticks after each (re)connect (see REASSERT_TICKS).
+  let mut reassert: u32 = 0;
 
   // One fast initial attempt; looping here would leave connect() pending while Discord is closed.
   let first = {
@@ -249,7 +268,7 @@ async fn worker<R: Runtime>(
       ev.connected(false);
       let _ = ready_tx.send(Err(err));
       match reconnect_and_restore(&app_id, &mut cmd_rx, &ev).await {
-        Some(c) => c,
+        Some(c) => { reassert = REASSERT_TICKS; c }
         None    => return,
       }
     }
@@ -272,25 +291,36 @@ async fn worker<R: Runtime>(
           Outcome::Ok            => client = c,
           Outcome::Rejected(msg) => { ev.error(&msg); client = c; } // stay connected
           Outcome::Dead          => {
+            eprintln!("[drpc-recon] {} pipe DEAD (on set/clear) — reconnecting", ts()); // TEMP debug
             drop(c);
             ev.connected(false);
             match reconnect_and_restore(&app_id, &mut cmd_rx, &ev).await {
-              Some(nc) => client = nc,
+              Some(nc) => { client = nc; reassert = REASSERT_TICKS; }
               None     => return,
             }
           }
         }
       }
 
-      // Passive liveness: ping the pipe instead of re-sending presence twice a second, so a drop
-      // while idle (e.g. Discord restarted) is noticed and we reconnect and restore.
+      // Passive liveness. Normally a tiny PING; but for REASSERT_TICKS after a (re)connect we
+      // re-send full presence payload instead — Discord can accept set_activity right after a restart
+      // without rendering it, so re-asserting makes it actually appear. The apply doubles as liveness.
       _ = sleep(LIVENESS) => {
-        let (c, outcome) = ping(client).await;
+        let latest = if reassert > 0 { cmd_rx.borrow().clone() } else { None };
+        let (c, outcome) = match latest {
+          Some(cmd) => {
+            reassert -= 1;
+            eprintln!("[drpc-recon] {} re-assert presence ({} ticks left)", ts(), reassert); // TEMP debug
+            apply(client, cmd).await
+          }
+          None => ping(client).await,
+        };
         if outcome == Outcome::Dead {
+          eprintln!("[drpc-recon] {} pipe DEAD (liveness) — reconnecting", ts()); // TEMP debug
           drop(c);
           ev.connected(false);
           match reconnect_and_restore(&app_id, &mut cmd_rx, &ev).await {
-            Some(nc) => client = nc,
+            Some(nc) => { client = nc; reassert = REASSERT_TICKS; }
             None     => return,
           }
         } else {
@@ -313,10 +343,13 @@ async fn connect_loop(
     }
 
     let id = app_id.to_owned();
+    eprintln!("[drpc-recon] {} handshake attempt {}", ts(), attempt); // TEMP debug
     match tokio::task::spawn_blocking(move || handshake(&id)).await {
-      Ok(Ok(pair)) => return Some(pair),
+      Ok(Ok(pair)) => { eprintln!("[drpc-recon] {} handshake OK (attempt {})", ts(), attempt); return Some(pair); } // TEMP debug
       _ => {
-        sleep(backoff_delay(attempt)).await;
+        let d = backoff_delay(attempt);
+        eprintln!("[drpc-recon] {} handshake FAIL (attempt {}) -> sleep {}ms", ts(), attempt, d.as_millis()); // TEMP debug
+        sleep(d).await;
         attempt = attempt.saturating_add(1);
       }
     }
