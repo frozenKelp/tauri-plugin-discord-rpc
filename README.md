@@ -143,10 +143,13 @@ Sets the current Rich Presence activity. All fields are optional.
 
 ```ts
 interface Activity {
+  name?:       string       // activity name; substitute app's registered name
   details?:    string       // top line of the presence
   state?:      string       // second line
   detailsUrl?: string       // makes the details line a clickable link
   stateUrl?:   string       // makes the state line a clickable link
+  activityType?:      number // 0 Playing, 2 Listening, 3 Watching, 5 Competing
+  statusDisplayType?: number // 0 Name, 1 State, 2 Details // which line shows as the headline
   timestamps?: {
     start?: number          // epoch ms — shows elapsed time
     end?:   number          // epoch ms — shows remaining time
@@ -154,8 +157,10 @@ interface Activity {
   assets?: {
     largeImage?: string     // art asset key or https:// URL
     largeText?:  string     // tooltip on hover
+    largeUrl?:   string     // large image , clickable link
     smallImage?: string
     smallText?:  string
+    smallUrl?:   string     // small image , clickable link
   }
   buttons?: Array<{
     label: string           // max 32 chars
@@ -200,9 +205,7 @@ The plugin emits these events (listen via `@tauri-apps/api/event`):
 | `discord-rpc://ready`     | `User`    | Right after a successful handshake — carries the logged-in user. |
 | `discord-rpc://error`     | `string`  | Discord rejected a presence update; payload is its message. The connection stays up. |
 
-> **Note on the activity name:** there is intentionally no `name` field. Per Discord's
-> guidelines the activity name is fixed to your registered application's name and cannot be
-> overridden via RPC.
+> **Note on the activity name:** you may substitute the registered application's name with `name`.
 
 ## Migration
 

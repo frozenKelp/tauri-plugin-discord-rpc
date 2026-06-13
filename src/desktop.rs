@@ -16,11 +16,10 @@ use crate::error::{Error, Result};
 // that idle presence reappears promptly, while still being a tiny ping (not the old 500ms activity
 // resend). An active write (a presence change) detects a dead pipe immediately on its own.
 const LIVENESS:        Duration = Duration::from_secs(2);
-// After a (re)connect, re-assert full presence
-// Discord will accept set_activity right after restart, return Ok, and trash it to god knows where without RENDERING it.
-// it only renders activity when its ready.
-// re-sending makes the presence actually appear. 
-// 4 ticks × LIVENESS(2s) ≈ 8s window.
+// After a (re)connect, re-assert full presence for a few liveness ticks. 
+// Discord will accept set_activity after restart, return Ok, then trash it.
+// it only renders presence once fully ready, so re-sending presence to be sure.
+// 2 ticks × LIVENESS(2s) ≈ 4s window.
 const REASSERT_TICKS:  u32      = 2;
 
 #[derive(Clone, Debug)]
