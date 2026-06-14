@@ -1,10 +1,9 @@
 <script>
   import { setActivity, clearActivity } from 'tauri-plugin-discord-rpc-api'
-  import { ACTIVITY_TYPES, STATUS_DISPLAY_TYPES, createActivityForm, cleanActivity } from './activity-form.js'
+  import { ACTIVITY_TYPES, STATUS_DISPLAY_TYPES, cleanActivity } from './activity-form.js'
 
-  let { connected = false } = $props()
+  let { connected = false, form = $bindable() } = $props()
 
-  let form = $state(createActivityForm())
   let status = $state('')
   const payload = $derived(cleanActivity(form))
   const payloadJson = $derived(JSON.stringify(payload, null, 2))
@@ -19,47 +18,64 @@
   }
 </script>
 
-<div class="grid">
-  <form onsubmit={(e) => e.preventDefault()}>
-    <label>Type
+<div class="demo">
+  <div class="fields">
+    <label class="field"><span>Type</span>
       <select bind:value={form.activityType}>
         {#each ACTIVITY_TYPES as t}<option value={t.value}>{t.label}</option>{/each}
       </select>
     </label>
-    <label>Status display
+    <label class="field"><span>Status display</span>
       <select bind:value={form.statusDisplayType}>
         {#each STATUS_DISPLAY_TYPES as t}<option value={t.value}>{t.label}</option>{/each}
       </select>
     </label>
-    <label>Name <input bind:value={form.name} /></label>
-    <label>Details <input bind:value={form.details} /></label>
-    <label>Details URL <input bind:value={form.detailsUrl} /></label>
-    <label>State <input bind:value={form.state} /></label>
-    <label>State URL <input bind:value={form.stateUrl} /></label>
-    <fieldset><legend>Assets</legend>
-      <label>Large image <input bind:value={form.assets.largeImage} /></label>
-      <label>Large text <input bind:value={form.assets.largeText} /></label>
-      <label>Large URL <input bind:value={form.assets.largeUrl} /></label>
-      <label>Small image <input bind:value={form.assets.smallImage} /></label>
-      <label>Small text <input bind:value={form.assets.smallText} /></label>
-      <label>Small URL <input bind:value={form.assets.smallUrl} /></label>
-    </fieldset>
-    <fieldset><legend>Buttons (max 2)</legend>
-      {#each form.buttons as button}
-        <label>Label <input bind:value={button.label} /></label>
-        <label>URL <input bind:value={button.url} /></label>
-      {/each}
-    </fieldset>
-    <fieldset><legend>Party</legend>
-      <label>Id <input bind:value={form.party.id} /></label>
-      <label>Current <input type="number" bind:value={form.party.currentSize} /></label>
-      <label>Max <input type="number" bind:value={form.party.maxSize} /></label>
-    </fieldset>
-    <div class="actions">
-      <button type="button" onclick={apply} disabled={!connected}>Set activity</button>
-      <button type="button" onclick={clear} disabled={!connected}>Clear</button>
-      <span>{status}</span>
+    <label class="field"><span>Name</span><input bind:value={form.name} /></label>
+    <label class="field"><span>Details</span><input bind:value={form.details} /></label>
+    <label class="field"><span>Details URL</span><input bind:value={form.detailsUrl} /></label>
+    <label class="field"><span>State</span><input bind:value={form.state} /></label>
+    <label class="field"><span>State URL</span><input bind:value={form.stateUrl} /></label>
+  </div>
+
+  <fieldset>
+    <legend>Assets</legend>
+    <div class="fields">
+      <label class="field"><span>Large image</span><input bind:value={form.assets.largeImage} /></label>
+      <label class="field"><span>Large text</span><input bind:value={form.assets.largeText} /></label>
+      <label class="field"><span>Large URL</span><input bind:value={form.assets.largeUrl} /></label>
+      <label class="field"><span>Small image</span><input bind:value={form.assets.smallImage} /></label>
+      <label class="field"><span>Small text</span><input bind:value={form.assets.smallText} /></label>
+      <label class="field"><span>Small URL</span><input bind:value={form.assets.smallUrl} /></label>
     </div>
-  </form>
-  <pre class="preview">{payloadJson}</pre>
+  </fieldset>
+
+  <fieldset>
+    <legend>Buttons (max 2)</legend>
+    {#each form.buttons as button, i}
+      <div class="btn-row">
+        <label class="field"><span>Label {i + 1}</span><input bind:value={button.label} /></label>
+        <label class="field"><span>URL {i + 1}</span><input bind:value={button.url} /></label>
+      </div>
+    {/each}
+  </fieldset>
+
+  <fieldset>
+    <legend>Party</legend>
+    <div class="fields">
+      <label class="field"><span>Id</span><input bind:value={form.party.id} /></label>
+      <label class="field"><span>Current size</span><input type="number" bind:value={form.party.currentSize} /></label>
+      <label class="field"><span>Max size</span><input type="number" bind:value={form.party.maxSize} /></label>
+    </div>
+  </fieldset>
+
+  <div class="actions">
+    <button type="button" onclick={apply} disabled={!connected}>Set activity</button>
+    <button type="button" onclick={clear} disabled={!connected}>Clear</button>
+    {#if status}<span class="msg">{status}</span>{/if}
+  </div>
+
+  <details class="payload" open>
+    <summary>Payload preview</summary>
+    <pre class="preview">{payloadJson}</pre>
+  </details>
 </div>

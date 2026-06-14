@@ -10,67 +10,49 @@
   let connected = $state(false)
   let busy = $state(false)
   let user = $state(null)
-  let log = $state([])
+  let msg = $state('')
 
   const unlisteners = []
 
-  function addLog(kind, detail) {
-    log = [{ t: new Date().toLocaleTimeString(), kind, detail }, ...log].slice(0, 50)
-  }
   function setConnected(v) {
     connected = v
     onConnectedChange(v)
+    if (!v) user = null
   }
 
   onMount(async () => {
     connected = await isConnected().catch(() => false)
     if (connected) { user = await getCurrentUser().catch(() => null); onConnectedChange(true) }
-    unlisteners.push(await listen('discord-rpc://connected', ({ payload }) => {
-      setConnected(payload); addLog('connected', String(payload))
-      if (!payload) user = null
-    }))
-    unlisteners.push(await listen('discord-rpc://ready', ({ payload }) => {
-      user = payload; addLog('ready', payload?.username ?? '')
-    }))
-    unlisteners.push(await listen('discord-rpc://error', ({ payload }) => {
-      addLog('error', String(payload))
-    }))
+    unlisteners.push(await listen('discord-rpc://connected', ({ payload }) => setConnected(payload)))
+    unlisteners.push(await listen('discord-rpc://ready', ({ payload }) => { user = payload }))
   })
   onDestroy(() => unlisteners.forEach(u => u?.()))
 
   async function handleConnect() {
-    busy = true
-    try { await connect(appId); addLog('action', 'connect ok') }
-    catch (e) { addLog('error', String(e)) }
+    busy = true; msg = ''
+    // connect() resolves Ok once the first attempt succeeds; reflect it immediately rather than
+    // waiting on the connected event (and it keeps retrying in the background on its own).
+    try { await connect(appId); setConnected(true) }
+    catch (e) { msg = String(e); setConnected(false) }
     finally { busy = false }
   }
   async function handleDisconnect() {
-    busy = true
-    try { await disconnect() } catch (e) { addLog('error', String(e)) }
-    finally { busy = false; user = null }
+    busy = true; msg = ''
+    // disconnect() tears down the worker without emitting a `connected:false` event, so update local state directly
+    try { await disconnect() } catch (e) { msg = String(e) }
+    setConnected(false)
+    busy = false
   }
 </script>
 
-<section class="bar">
-  <div class="row">
-    <input bind:value={appId} placeholder="Discord application id" disabled={connected} />
-    {#if connected}
-      <button onclick={handleDisconnect} disabled={busy}>Disconnect</button>
-    {:else}
-      <button onclick={handleConnect} disabled={busy}>Connect</button>
-    {/if}
-    <span class="dot" class:on={connected}></span>
-    <span>{connected ? 'connected' : 'disconnected'}</span>
-  </div>
-
-  {#if user}
-    <div class="user">Logged in as <b>{user.globalName ?? user.username}</b> ({user.id})</div>
+<section class="connbar">
+  <input class="appid" bind:value={appId} placeholder="Discord app. id" disabled={connected} />
+  {#if connected}
+    <button type="button" onclick={handleDisconnect} disabled={busy}>Disconnect</button>
+  {:else}
+    <button type="button" onclick={handleConnect} disabled={busy}>Connect</button>
   {/if}
-
-  <details open>
-    <summary>Event log</summary>
-    <ul class="log">
-      {#each log as e}<li><code>{e.t}</code> <b>{e.kind}</b> {e.detail}</li>{/each}
-    </ul>
-  </details>
+  <span class="status"><span class="dot" class:on={connected}></span>{connected ? 'connected' : 'disconnected'}</span>
+  {#if user}<span class="user">as <b>{user.globalName ?? user.username}</b></span>{/if}
+  {#if msg}<span class="msg">{msg}</span>{/if}
 </section>
