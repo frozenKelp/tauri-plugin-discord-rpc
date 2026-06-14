@@ -10,8 +10,6 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use discord_rich_presence::{activity, DiscordIpc, DiscordIpcClient};
 use serde_json::Value;
 
-static NONCE_SEQ: AtomicU64 = AtomicU64::new(0);
-
 use crate::models::{Activity, User};
 use crate::error::{Error, Result};
 
@@ -25,6 +23,8 @@ const LIVENESS:        Duration = Duration::from_secs(2);
 // it only renders presence once fully ready, so re-sending presence to be sure.
 // 2 ticks × LIVENESS(2s) ≈ 4s window.
 const REASSERT_TICKS:  u32      = 2;
+// Monotonic counter behind rpc_nonce() — gives each raw SET_ACTIVITY frame a unique nonce.
+static NONCE_SEQ: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Clone, Debug)]
 enum Cmd {

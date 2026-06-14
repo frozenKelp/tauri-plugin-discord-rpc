@@ -45,9 +45,9 @@
       <label>Small URL <input bind:value={form.assets.smallUrl} /></label>
     </fieldset>
     <fieldset><legend>Buttons (max 2)</legend>
-      {#each form.buttons as btn, i}
-        <label>Label <input bind:value={form.buttons[i].label} /></label>
-        <label>URL <input bind:value={form.buttons[i].url} /></label>
+      {#each form.buttons as button}
+        <label>Label <input bind:value={button.label} /></label>
+        <label>URL <input bind:value={button.url} /></label>
       {/each}
     </fieldset>
     <fieldset><legend>Party</legend>
@@ -56,8 +56,8 @@
       <label>Max <input type="number" bind:value={form.party.maxSize} /></label>
     </fieldset>
     <div class="actions">
-      <button onclick={apply} disabled={!connected}>Set activity</button>
-      <button onclick={clear} disabled={!connected}>Clear</button>
+      <button type="button" onclick={apply} disabled={!connected}>Set activity</button>
+      <button type="button" onclick={clear} disabled={!connected}>Clear</button>
       <span>{status}</span>
     </div>
   </form>
