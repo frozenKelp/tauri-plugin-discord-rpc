@@ -367,10 +367,22 @@
           "markdownDescription": "Denies the set_activity command without any pre-configured scope."
         },
         {
-          "description": "Default permissions for the plugin\n#### This default permission set includes:\n\n- `allow-connect`\n- `allow-disconnect`\n- `allow-set-activity`\n- `allow-clear-activity`\n- `allow-is-connected`\n- `allow-get-current-user`",
+          "description": "Enables the set_activity_raw command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-set-activity-raw",
+          "markdownDescription": "Enables the set_activity_raw command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the set_activity_raw command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-set-activity-raw",
+          "markdownDescription": "Denies the set_activity_raw command without any pre-configured scope."
+        },
+        {
+          "description": "Default permissions for the plugin\n#### This default permission set includes:\n\n- `allow-connect`\n- `allow-disconnect`\n- `allow-set-activity`\n- `allow-set-activity-raw`\n- `allow-clear-activity`\n- `allow-is-connected`\n- `allow-get-current-user`",
           "type": "string",
           "const": "default",
-          "markdownDescription": "Default permissions for the plugin\n#### This default permission set includes:\n\n- `allow-connect`\n- `allow-disconnect`\n- `allow-set-activity`\n- `allow-clear-activity`\n- `allow-is-connected`\n- `allow-get-current-user`"
+          "markdownDescription": "Default permissions for the plugin\n#### This default permission set includes:\n\n- `allow-connect`\n- `allow-disconnect`\n- `allow-set-activity`\n- `allow-set-activity-raw`\n- `allow-clear-activity`\n- `allow-is-connected`\n- `allow-get-current-user`"
         }
       ]
     }

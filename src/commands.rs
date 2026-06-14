@@ -17,6 +17,14 @@ pub(crate) async fn set_activity<R: Runtime>(app: AppHandle<R>, payload: Activit
 }
 
 #[command]
+pub(crate) async fn set_activity_raw<R: Runtime>(
+  app: AppHandle<R>,
+  payload: serde_json::Value,
+) -> Result<()> {
+  app.discord_rpc().set_activity_raw(payload).await
+}
+
+#[command]
 pub(crate) async fn clear_activity<R: Runtime>(app: AppHandle<R>) -> Result<()> {
   app.discord_rpc().clear_activity().await
 }

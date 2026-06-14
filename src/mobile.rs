@@ -18,6 +18,7 @@ impl<R: Runtime> DiscordRpc<R> {
   pub async fn connect(&self, _app_id: String) -> crate::Result<()> { Err(Error::Unsupported) }
   pub async fn disconnect(&self) -> crate::Result<()> { Err(Error::Unsupported) }
   pub async fn set_activity(&self, _payload: Activity) -> crate::Result<()> { Err(Error::Unsupported) }
+  pub async fn set_activity_raw(&self, _payload: serde_json::Value) -> crate::Result<()> { Err(Error::Unsupported) }
   pub async fn clear_activity(&self) -> crate::Result<()> { Err(Error::Unsupported) }
   pub async fn is_connected(&self) -> bool { false }
   pub async fn get_current_user(&self) -> Option<User> { None }

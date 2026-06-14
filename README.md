@@ -52,6 +52,7 @@ Or grant individual permissions:
     "discord-rpc:allow-disconnect",
     "discord-rpc:allow-set-activity",
     "discord-rpc:allow-clear-activity",
+    "discord-rpc:allow-set-activity-raw",
     "discord-rpc:allow-is-connected",
     "discord-rpc:allow-get-current-user"
   ]
@@ -177,6 +178,13 @@ interface Activity {
 #### `clearActivity(): Promise<void>`
 Clears the current Rich Presence activity without disconnecting.
 
+#### `setActivityRaw(payload: unknown): Promise<void>`
+
+Advanced escape hatch: sends a raw activity object straight to Discord (`SET_ACTIVITY`), bypassing
+the typed `Activity`. Use it to probe fields the typed API doesn't model. Note that some fields
+(e.g. `secrets` for Ask-to-Join/Spectate) require OAuth, which this plugin does not implement, so
+Discord may ignore or reject them — watch the `discord-rpc://error` event.
+
 #### `isConnected(): Promise<boolean>`
 Returns `true` while the RPC connection to Discord is live (not whether a Discord process
 merely exists on the system).
@@ -215,6 +223,17 @@ The plugin emits these events (listen via `@tauri-apps/api/event`):
 - New, additive: the `discord-rpc://ready` / `discord-rpc://error` events and
   `getCurrentUser()`. `setActivity()` keeps its resolve-on-accept contract; watch the
   `error` event to learn when Discord rejects an update.
+
+## Example
+
+A runnable example lives in `examples/tauri-app/` (Svelte 5 + Vite). It has two isolated modes:
+a **Plugin Demo** tab that drives the typed `setActivity` API, and a **Custom Payload** tab that
+sends raw JSON via `setActivityRaw` for experimentation. Run it with:
+
+```bash
+pnpm --dir examples/tauri-app install
+pnpm --dir examples/tauri-app tauri dev
+```
 
 ## Requirements
 

@@ -66,6 +66,11 @@ export async function setActivity(payload: Activity): Promise<void> {
   await invoke('plugin:discord-rpc|set_activity', { payload })
 }
 
+/** Send a raw activity payload straight to Discord (bypasses the typed API). Advanced/experimental. */
+export async function setActivityRaw(payload: unknown): Promise<void> {
+  await invoke('plugin:discord-rpc|set_activity_raw', { payload })
+}
+
 export async function clearActivity(): Promise<void> {
   await invoke('plugin:discord-rpc|clear_activity')
 }
