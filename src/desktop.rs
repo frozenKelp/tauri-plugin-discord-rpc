@@ -5,8 +5,12 @@ use tokio::{
   task::JoinHandle,
   time::sleep,
 };
-use std::time::Duration;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use discord_rich_presence::{activity, DiscordIpc, DiscordIpcClient};
+use serde_json::Value;
+
+static NONCE_SEQ: AtomicU64 = AtomicU64::new(0);
 
 use crate::models::{Activity, User};
 use crate::error::{Error, Result};
@@ -26,6 +30,7 @@ const REASSERT_TICKS:  u32      = 2;
 enum Cmd {
   Set(Activity),
   Clear,
+  Raw(Value),
 }
 
 // Result of reading Discord's response to one write.
@@ -133,6 +138,10 @@ impl<R: Runtime> DiscordRpc<R> {
     self.send_cmd(Cmd::Set(payload)).await
   }
 
+  pub async fn set_activity_raw(&self, payload: Value) -> Result<()> {
+    self.send_cmd(Cmd::Raw(payload)).await
+  }
+
   pub async fn clear_activity(&self) -> Result<()> {
     self.send_cmd(Cmd::Clear).await
   }
@@ -161,6 +170,7 @@ async fn apply(client: DiscordIpcClient, cmd: Cmd) -> (DiscordIpcClient, Outcome
     let wrote = match &cmd {
       Cmd::Set(act) => client.set_activity(build_activity(act)),
       Cmd::Clear    => client.clear_activity(),
+      Cmd::Raw(v)   => client.send(set_activity_frame(v.clone()), 1),
     };
     let outcome = match wrote {
       Err(_) => Outcome::Dead,
@@ -336,6 +346,26 @@ async fn connect_loop(
       }
     }
   }
+}
+
+// Wrap a caller-supplied activity Value in a SET_ACTIVITY IPC frame. Used by the raw escape hatch
+// so the example (and advanced users) can probe fields the typed Activity doesn't model.
+fn set_activity_frame(activity: Value) -> Value {
+  serde_json::json!({
+    "cmd":   "SET_ACTIVITY",
+    "args":  { "pid": std::process::id(), "activity": activity },
+    "nonce": rpc_nonce(),
+  })
+}
+
+// Monotonic, process-unique nonce for raw frames (timestamp + counter; uniqueness, not crypto).
+fn rpc_nonce() -> String {
+  let seq   = NONCE_SEQ.fetch_add(1, Ordering::Relaxed);
+  let stamp = SystemTime::now()
+    .duration_since(UNIX_EPOCH)
+    .map(|d| d.as_nanos())
+    .unwrap_or_default();
+  format!("tpdr-{stamp}-{seq}")
 }
 
 fn build_activity(payload: &Activity) -> activity::Activity<'_> {
@@ -534,5 +564,20 @@ mod tests {
     ];
     assert_eq!(capped_buttons(&btns).len(), 2);
     assert_eq!(capped_buttons(&btns[..1]).len(), 1);
+  }
+
+  #[test]
+  fn raw_frame_wraps_activity_verbatim() {
+    let activity = serde_json::json!({ "state": "hi", "type": 4, "emoji": { "name": "✨" } });
+    let frame = set_activity_frame(activity.clone());
+    assert_eq!(frame["cmd"], "SET_ACTIVITY");
+    assert_eq!(frame["args"]["activity"], activity);
+    assert!(frame["args"]["pid"].is_number());
+    assert!(frame["nonce"].is_string());
+  }
+
+  #[test]
+  fn nonces_are_unique() {
+    assert_ne!(rpc_nonce(), rpc_nonce());
   }
 }

@@ -34,6 +34,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
       commands::connect,
       commands::disconnect,
       commands::set_activity,
+      commands::set_activity_raw,
       commands::clear_activity,
       commands::is_connected,
       commands::get_current_user,

@@ -49,6 +49,8 @@ export interface Activity {
 export declare function connect(appId: string): Promise<void>;
 export declare function disconnect(): Promise<void>;
 export declare function setActivity(payload: Activity): Promise<void>;
+/** Send a raw activity payload straight to Discord (bypasses the typed API). Advanced/experimental. */
+export declare function setActivityRaw(payload: unknown): Promise<void>;
 export declare function clearActivity(): Promise<void>;
 export declare function isConnected(): Promise<boolean>;
 export declare function getCurrentUser(): Promise<User | null>;

@@ -7,6 +7,7 @@ Default permissions for the plugin
 - `allow-connect`
 - `allow-disconnect`
 - `allow-set-activity`
+- `allow-set-activity-raw`
 - `allow-clear-activity`
 - `allow-is-connected`
 - `allow-get-current-user`
@@ -172,6 +173,32 @@ Enables the set_activity command without any pre-configured scope.
 <td>
 
 Denies the set_activity command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`discord-rpc:allow-set-activity-raw`
+
+</td>
+<td>
+
+Enables the set_activity_raw command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`discord-rpc:deny-set-activity-raw`
+
+</td>
+<td>
+
+Denies the set_activity_raw command without any pre-configured scope.
 
 </td>
 </tr>
