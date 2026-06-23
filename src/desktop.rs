@@ -487,18 +487,39 @@ fn parse_ready(frame: &serde_json::Value) -> Result<User> {
   })
 }
 
+fn stale_ipc_path() -> Option<std::path::PathBuf> {
+  let base = std::env::var("XDG_RUNTIME_DIR")
+    .or_else(|_| std::env::var("TMPDIR"))
+    .or_else(|_| std::env::var("TMP"))
+    .or_else(|_| std::env::var("TEMP"))
+    .ok()?;
+  for i in 0..10u8 {
+    let p = std::path::Path::new(&base).join(format!("discord-ipc-{i}"));
+    if p.exists() {
+      return Some(p);
+    }
+  }
+  None
+}
+
 // Hand-rolled handshake so we can KEEP the READY frame (the crate's connect() throws it away).
 // Transport failures map to NotConnected (Discord closed, retryable); an explicit ERROR frame maps
 // to Rpc (e.g. invalid client_id) via parse_ready.
 fn handshake(app_id: &str) -> Result<(DiscordIpcClient, User)> {
   let mut client = DiscordIpcClient::new(app_id);
   client.connect_ipc().map_err(|_| Error::NotConnected)?;
-  client
-    .send(serde_json::json!({ "v": 1, "client_id": app_id }), 0)
-    .map_err(|_| Error::NotConnected)?;
-  let (_op, frame) = client.recv().map_err(|_| Error::NotConnected)?;
-  let user = parse_ready(&frame)?;
-  Ok((client, user))
+  let send_result = client.send(serde_json::json!({ "v": 1, "client_id": app_id }), 0);
+  if send_result.is_err() {
+    if let Some(p) = stale_ipc_path() { let _ = std::fs::remove_file(p); }
+    return Err(Error::NotConnected);
+  }
+  match client.recv() {
+    Err(_) => {
+      if let Some(p) = stale_ipc_path() { let _ = std::fs::remove_file(p); }
+      Err(Error::NotConnected)
+    }
+    Ok((_op, frame)) => parse_ready(&frame).map(|user| (client, user)),
+  }
 }
 
 #[cfg(test)]
