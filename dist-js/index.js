@@ -9,11 +9,18 @@ async function disconnect() {
 async function setActivity(payload) {
     await invoke('plugin:discord-rpc|set_activity', { payload });
 }
+/** Send a raw activity payload straight to Discord (bypasses the typed API). Advanced/experimental. */
+async function setActivityRaw(payload) {
+    await invoke('plugin:discord-rpc|set_activity_raw', { payload });
+}
 async function clearActivity() {
     await invoke('plugin:discord-rpc|clear_activity');
 }
-async function isRunning() {
-    return await invoke('plugin:discord-rpc|is_running');
+async function isConnected() {
+    return await invoke('plugin:discord-rpc|is_connected');
+}
+async function getCurrentUser() {
+    return await invoke('plugin:discord-rpc|get_current_user');
 }
 
-export { clearActivity, connect, disconnect, isRunning, setActivity };
+export { clearActivity, connect, disconnect, getCurrentUser, isConnected, setActivity, setActivityRaw };

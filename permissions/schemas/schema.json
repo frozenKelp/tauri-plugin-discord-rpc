@@ -331,16 +331,28 @@
           "markdownDescription": "Denies the disconnect command without any pre-configured scope."
         },
         {
-          "description": "Enables the is_running command.",
+          "description": "Enables the get_current_user command without any pre-configured scope.",
           "type": "string",
-          "const": "allow-is-running",
-          "markdownDescription": "Enables the is_running command."
+          "const": "allow-get-current-user",
+          "markdownDescription": "Enables the get_current_user command without any pre-configured scope."
         },
         {
-          "description": "Denies the is_running command.",
+          "description": "Denies the get_current_user command without any pre-configured scope.",
           "type": "string",
-          "const": "deny-is-running",
-          "markdownDescription": "Denies the is_running command."
+          "const": "deny-get-current-user",
+          "markdownDescription": "Denies the get_current_user command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the is_connected command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-is-connected",
+          "markdownDescription": "Enables the is_connected command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the is_connected command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-is-connected",
+          "markdownDescription": "Denies the is_connected command without any pre-configured scope."
         },
         {
           "description": "Enables the set_activity command without any pre-configured scope.",
@@ -355,10 +367,22 @@
           "markdownDescription": "Denies the set_activity command without any pre-configured scope."
         },
         {
-          "description": "Default permissions for the plugin\n#### This default permission set includes:\n\n- `allow-connect`\n- `allow-disconnect`\n- `allow-set-activity`\n- `allow-clear-activity`\n- `allow-is-running`",
+          "description": "Enables the set_activity_raw command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-set-activity-raw",
+          "markdownDescription": "Enables the set_activity_raw command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the set_activity_raw command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-set-activity-raw",
+          "markdownDescription": "Denies the set_activity_raw command without any pre-configured scope."
+        },
+        {
+          "description": "Default permissions for the plugin\n#### This default permission set includes:\n\n- `allow-connect`\n- `allow-disconnect`\n- `allow-set-activity`\n- `allow-set-activity-raw`\n- `allow-clear-activity`\n- `allow-is-connected`\n- `allow-get-current-user`",
           "type": "string",
           "const": "default",
-          "markdownDescription": "Default permissions for the plugin\n#### This default permission set includes:\n\n- `allow-connect`\n- `allow-disconnect`\n- `allow-set-activity`\n- `allow-clear-activity`\n- `allow-is-running`"
+          "markdownDescription": "Default permissions for the plugin\n#### This default permission set includes:\n\n- `allow-connect`\n- `allow-disconnect`\n- `allow-set-activity`\n- `allow-set-activity-raw`\n- `allow-clear-activity`\n- `allow-is-connected`\n- `allow-get-current-user`"
         }
       ]
     }

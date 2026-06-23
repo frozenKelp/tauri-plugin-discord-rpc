@@ -7,8 +7,10 @@ Default permissions for the plugin
 - `allow-connect`
 - `allow-disconnect`
 - `allow-set-activity`
+- `allow-set-activity-raw`
 - `allow-clear-activity`
-- `allow-is-running`
+- `allow-is-connected`
+- `allow-get-current-user`
 
 ## Permission Table
 
@@ -100,12 +102,12 @@ Denies the disconnect command without any pre-configured scope.
 <tr>
 <td>
 
-`discord-rpc:allow-is-running`
+`discord-rpc:allow-get-current-user`
 
 </td>
 <td>
 
-Enables the is_running command.
+Enables the get_current_user command without any pre-configured scope.
 
 </td>
 </tr>
@@ -113,12 +115,38 @@ Enables the is_running command.
 <tr>
 <td>
 
-`discord-rpc:deny-is-running`
+`discord-rpc:deny-get-current-user`
 
 </td>
 <td>
 
-Denies the is_running command.
+Denies the get_current_user command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`discord-rpc:allow-is-connected`
+
+</td>
+<td>
+
+Enables the is_connected command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`discord-rpc:deny-is-connected`
+
+</td>
+<td>
+
+Denies the is_connected command without any pre-configured scope.
 
 </td>
 </tr>
@@ -145,6 +173,32 @@ Enables the set_activity command without any pre-configured scope.
 <td>
 
 Denies the set_activity command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`discord-rpc:allow-set-activity-raw`
+
+</td>
+<td>
+
+Enables the set_activity_raw command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`discord-rpc:deny-set-activity-raw`
+
+</td>
+<td>
+
+Denies the set_activity_raw command without any pre-configured scope.
 
 </td>
 </tr>

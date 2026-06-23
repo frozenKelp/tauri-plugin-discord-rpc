@@ -4,6 +4,8 @@ permissions = [
   "allow-connect",
   "allow-disconnect",
   "allow-set-activity",
+  "allow-set-activity-raw",
   "allow-clear-activity",
-  "allow-is-running",
+  "allow-is-connected",
+  "allow-get-current-user",
 ]

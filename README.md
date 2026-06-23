@@ -52,7 +52,9 @@ Or grant individual permissions:
     "discord-rpc:allow-disconnect",
     "discord-rpc:allow-set-activity",
     "discord-rpc:allow-clear-activity",
-    "discord-rpc:allow-is-running"
+    "discord-rpc:allow-set-activity-raw",
+    "discord-rpc:allow-is-connected",
+    "discord-rpc:allow-get-current-user"
   ]
 }
 ```
@@ -65,7 +67,8 @@ import {
   disconnect,
   setActivity,
   clearActivity,
-  isRunning,
+  isConnected,
+  getCurrentUser,
 } from "tauri-plugin-discord-rpc-api";
 ```
 
@@ -110,10 +113,16 @@ await setActivity({
 await clearActivity();
 ```
 
-### Check if Discord is Running
+### Check if Connected
 
 ```ts
-const running = await isRunning(); // boolean
+const connected = await isConnected(); // boolean — is the RPC link to Discord live?
+```
+
+### Get the Logged-in User
+
+```ts
+const user = await getCurrentUser(); // User | null
 ```
 
 ### Disconnect
@@ -135,8 +144,13 @@ Sets the current Rich Presence activity. All fields are optional.
 
 ```ts
 interface Activity {
+  name?:       string       // activity name; substitute app's registered name
   details?:    string       // top line of the presence
   state?:      string       // second line
+  detailsUrl?: string       // makes the details line a clickable link
+  stateUrl?:   string       // makes the state line a clickable link
+  activityType?:      number // 0 Playing, 2 Listening, 3 Watching, 5 Competing
+  statusDisplayType?: number // 0 Name, 1 State, 2 Details // which line shows as the headline
   timestamps?: {
     start?: number          // epoch ms — shows elapsed time
     end?:   number          // epoch ms — shows remaining time
@@ -144,8 +158,10 @@ interface Activity {
   assets?: {
     largeImage?: string     // art asset key or https:// URL
     largeText?:  string     // tooltip on hover
+    largeUrl?:   string     // large image , clickable link
     smallImage?: string
     smallText?:  string
+    smallUrl?:   string     // small image , clickable link
   }
   buttons?: Array<{
     label: string           // max 32 chars
@@ -162,8 +178,62 @@ interface Activity {
 #### `clearActivity(): Promise<void>`
 Clears the current Rich Presence activity without disconnecting.
 
-#### `isRunning(): Promise<boolean>`
-Returns `true` if Discord is currently running on the system.
+#### `setActivityRaw(payload: unknown): Promise<void>`
+
+Advanced escape hatch: sends a raw activity object straight to Discord (`SET_ACTIVITY`), bypassing
+the typed `Activity`. Use it to probe fields the typed API doesn't model. Note that some fields
+(e.g. `secrets` for Ask-to-Join/Spectate) require OAuth, which this plugin does not implement, so
+Discord may ignore or reject them — watch the `discord-rpc://error` event.
+
+#### `isConnected(): Promise<boolean>`
+Returns `true` while the RPC connection to Discord is live (not whether a Discord process
+merely exists on the system).
+
+#### `getCurrentUser(): Promise<User | null>`
+Returns the logged-in Discord user captured from the `READY` handshake, or `null` if not
+connected.
+
+```ts
+interface User {
+  id:             string
+  username:       string
+  discriminator?: string
+  globalName?:    string
+  avatar?:        string   // avatar hash
+}
+```
+
+### Events
+
+The plugin emits these events (listen via `@tauri-apps/api/event`):
+
+| Event | Payload | When |
+|-------|---------|------|
+| `discord-rpc://connected` | `boolean` | Connection comes up (`true`) or drops (`false`). |
+| `discord-rpc://ready`     | `User`    | Right after a successful handshake — carries the logged-in user. |
+| `discord-rpc://error`     | `string`  | Discord rejected a presence update; payload is its message. The connection stays up. |
+
+> **Note on the activity name:** you may substitute the registered application's name with `name`.
+
+## Migration
+
+- `isRunning()` → **`isConnected()`** (same return type; clearer meaning).
+- Permission `discord-rpc:allow-is-running` → **`discord-rpc:allow-is-connected`**, and add
+  `discord-rpc:allow-get-current-user` if you grant permissions individually.
+- New, additive: the `discord-rpc://ready` / `discord-rpc://error` events and
+  `getCurrentUser()`. `setActivity()` keeps its resolve-on-accept contract; watch the
+  `error` event to learn when Discord rejects an update.
+
+## Example
+
+A runnable example lives in `examples/tauri-app/` (Svelte 5 + Vite). It has two isolated modes:
+a **Plugin Demo** tab that drives the typed `setActivity` API, and a **Custom Payload** tab that
+sends raw JSON via `setActivityRaw` for experimentation. Run it with:
+
+```bash
+pnpm --dir examples/tauri-app install
+pnpm --dir examples/tauri-app tauri dev
+```
 
 ## Requirements
 

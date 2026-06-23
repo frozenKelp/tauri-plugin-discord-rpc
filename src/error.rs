@@ -12,6 +12,8 @@ pub enum Error {
   NotConnected,
   #[error("Already connected to Discord")]
   AlreadyConnected,
+  #[error("Operation not supported on this platform")]
+  Unsupported,
 }
 
 impl Serialize for Error {

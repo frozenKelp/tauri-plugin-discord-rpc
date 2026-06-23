@@ -1,261 +1,95 @@
 <script>
-  import { connect, disconnect, setActivity, clearActivity, isRunning } from 'tauri-plugin-discord-rpc-api'
-  import { listen } from '@tauri-apps/api/event'
-  import { onMount, onDestroy } from 'svelte'
+  import ConnectionBar from './lib/ConnectionBar.svelte'
+  import EventLog from './lib/EventLog.svelte'
+  import PluginDemo from './lib/PluginDemo.svelte'
+  import CustomPayload from './lib/CustomPayload.svelte'
+  import { createActivityForm } from './lib/activity-form.js'
+  import { CUSTOM_TEMPLATES } from './lib/custom-payloads.js'
 
-  const APP_ID = '1489646398478487773'
+  let connected = $state(false)
+  let tab = $state('demo')
 
-  let connState  = $state('idle')
-  let running    = $state(false)
-  let statusMsg  = $state('')
-  let autoWatch  = $state(false)
+  // Editor state survives tab switches here
+  // save slots can snapshot/restore it.
+  let demoForm = $state(createActivityForm())
+  // Wrapped in an object so the editor text can be mutated in place (the child shares this proxy).
+  let raw = $state({ text: JSON.stringify(CUSTOM_TEMPLATES[0].activity, null, 2) })
 
-  let details   = $state('Testing plugin')
-  let presState = $state('It works')
-  let startTime = $state(true)
+  // Six in-memory save slots. Each null or { tab, data } where data is a form snapshot or raw text.
+  let slots = $state(Array(6).fill(null))
+  let note = $state('')
 
-  let buttons = $state([
-    { label: 'GitHub', url: 'https://github.com' },
-    { label: '',       url: '' },
-  ])
+  // Portable deep copy of plain JSON-safe data (avoids structuredClone, which some webviews lack).
+  /** @param {any} v */
+  const clone = (v) => JSON.parse(JSON.stringify(v))
 
-  const canConnect    = $derived(connState === 'idle' || connState === 'error')
-  const canDisconnect = $derived(connState === 'connected' || autoWatch)
-  const canSetClear   = $derived(connState === 'connected')
-
-  const validButtons = $derived(
-    buttons.filter(b => b.label.trim() && b.url.trim())
-  )
-
-  let unlisten
-  let stopLoop = false
-  const POLL_MS = 3000
-
-  onMount(async () => {
-    running = await isRunning().catch(() => false)
-    if (running) connState = 'connected'
-
-    unlisten = await listen('discord-rpc://running', ({ payload }) => {
-      running = payload
-      if (payload) {
-        connState = 'connected'
-        setStatus('Connected')
-      } else if (connState === 'connected') {
-        connState = 'idle'
-        setStatus('Discord closed — retrying…')
-      }
-    })
-  })
-
-  onDestroy(() => unlisten?.())
-
-  async function startAutoConnect() {
-    if (autoWatch) return
-    stopLoop  = false
-    autoWatch = true
-    setStatus('Watching for Discord…')
-
-    while (!stopLoop) {
-      if (connState !== 'connected' && connState !== 'connecting') {
-        connState = 'connecting'
-        setStatus('Connecting…')
-        try {
-          await connect(APP_ID)
-          if (stopLoop) await disconnect().catch(() => {})
-        } catch {
-          connState = 'idle'
-        }
-      }
-      if (!stopLoop) await delay(POLL_MS)
-    }
-
-    autoWatch = false
+  /** @param {number} i */
+  function saveSlot(i) {
+    slots[i] = tab === 'demo'
+      ? { tab, data: clone(demoForm) }
+      : { tab, data: raw.text }
+    note = `Saved current ${tab === 'demo' ? 'form' : 'payload'} → slot ${i + 1}`
+  }
+  /** @param {number} i */
+  function loadSlot(i) {
+    const slot = slots[i]
+    if (!slot) { note = `Slot ${i + 1} is empty — double-click to save`; return }
+    tab = slot.tab
+    // Mutate the shared state in place (don't reassign the bound prop) so the child's field
+    // bindings pick it up. clone() keeps the stored slot from aliasing the live editor.
+    if (slot.tab === 'demo') Object.assign(demoForm, clone(slot.data))
+    else raw.text = slot.data
+    note = `Loaded slot ${i + 1} (${slot.tab === 'demo' ? 'form' : 'payload'})`
   }
 
-  function stopAutoConnect() {
-    stopLoop = true
-    setStatus('Watcher stopped')
+  // Single click = load, double click = save. Defer the click briefly so a double-click cancels it.
+  /** @type {ReturnType<typeof setTimeout> | undefined} */
+  let clickTimer
+  /** @param {number} i */
+  function onSlotClick(i) {
+    if (clickTimer) return
+    clickTimer = setTimeout(() => { clickTimer = undefined; loadSlot(i) }, 250)
   }
-
-  async function handleConnect() {
-    connState = 'connecting'
-    setStatus('Connecting…')
-    try {
-      await connect(APP_ID)
-      running   = true
-      connState = 'connected'
-      setStatus('Connected')
-    } catch (e) {
-      connState = 'error'
-      setStatus(`${e}`)
-    }
+  /** @param {number} i */
+  function onSlotDblClick(i) {
+    clearTimeout(clickTimer); clickTimer = undefined
+    saveSlot(i)
   }
-
-  async function handleDisconnect() {
-    connState = 'disconnecting'
-    stopLoop  = true
-    try {
-      await disconnect()
-    } catch {}
-    running   = false
-    connState = 'idle'
-    autoWatch = false
-    setStatus('Disconnected')
-  }
-
-  async function handleSetActivity() {
-    try {
-      await setActivity({
-        details:    details   || undefined,
-        state:      presState || undefined,
-        timestamps: startTime ? { start: Date.now() } : undefined,
-        buttons:    validButtons.length ? validButtons : undefined,
-      })
-      setStatus('Activity set ✓')
-    } catch (e) {
-      setStatus(`Error: ${e}`)
-    }
-  }
-
-  async function handleClear() {
-    try {
-      await clearActivity()
-      setStatus('Activity cleared')
-    } catch (e) {
-      setStatus(`Error: ${e}`)
-    }
-  }
-
-  function setStatus(msg) { statusMsg = msg }
-  const delay = ms => new Promise(r => setTimeout(r, ms))
 </script>
 
 <main>
-  <h1>Discord RPC</h1>
+  <h1>tauri-plugin-discord-rpc — TEST</h1>
+  <div class="layout">
+    <section class="content">
+      <ConnectionBar onConnectedChange={(v) => (connected = v)} />
 
-  <div class="status-bar">
-    <span class="dot" class:green={connState === 'connected'} class:yellow={connState === 'connecting' || connState === 'disconnecting'} class:red={connState === 'error'}></span>
-    <span>{connState}</span>
-    {#if statusMsg}
-      <span class="sep">·</span>
-      <span class="msg">{statusMsg}</span>
-    {/if}
-  </div>
+      <nav class="tabs">
+        <button type="button" class:active={tab === 'demo'} onclick={() => (tab = 'demo')}>Plugin Demo</button>
+        <button type="button" class:active={tab === 'custom'} onclick={() => (tab = 'custom')}>Custom Payload</button>
+        <span class="slot-sep" aria-hidden="true"></span>
+        {#each slots as slot, i}
+          <button
+            type="button"
+            class="slot"
+            class:filled={slot}
+            title={slot
+              ? `Slot ${i + 1} (${slot.tab}) — click to load, double-click to overwrite`
+              : `Slot ${i + 1} empty — double-click to save current state`}
+            onclick={() => onSlotClick(i)}
+            ondblclick={() => onSlotDblClick(i)}
+          >{i + 1}</button>
+        {/each}
+      </nav>
 
-  <section>
-    <h2>Connection</h2>
-    <div class="row">
-      <button onclick={handleConnect} disabled={!canConnect || autoWatch}>Connect</button>
-      <button onclick={handleDisconnect} disabled={connState === 'idle' && !autoWatch}>Disconnect</button>
-      {#if !autoWatch}
-        <button class="accent" onclick={startAutoConnect}>▶ Start watcher</button>
+      {#if note}<p class="slot-note">{note}</p>{/if}
+
+      {#if tab === 'demo'}
+        <PluginDemo {connected} bind:form={demoForm} />
       {:else}
-        <button class="danger" onclick={stopAutoConnect}>■ Stop watcher</button>
+        <CustomPayload {connected} bind:raw={raw} />
       {/if}
-    </div>
-    <p class="hint"><strong>Watcher</strong> auto-connects when Discord opens and re-connects if it closes.</p>
-  </section>
+    </section>
 
-  <section>
-    <h2>Rich Presence</h2>
-
-    <label>
-      Details
-      <input type="text" bind:value={details} placeholder="What you're doing" />
-    </label>
-
-    <label>
-      State
-      <input type="text" bind:value={presState} placeholder="Party / status line" />
-    </label>
-
-    <label class="checkbox-label">
-      <input type="checkbox" bind:checked={startTime} />
-      Include elapsed timer (start = now)
-    </label>
-
-    <h3>Buttons <span class="hint-inline">(max 2, both fields required)</span></h3>
-    {#each buttons as btn, i}
-      <div class="btn-row">
-        <span class="btn-num">{i + 1}</span>
-        <input type="text" bind:value={btn.label} placeholder="Label" maxlength="32" />
-        <input type="url"  bind:value={btn.url}   placeholder="https://…" />
-      </div>
-    {/each}
-
-    <div class="row" style="margin-top:1rem">
-      <button onclick={handleSetActivity} disabled={!canSetClear}>Set activity</button>
-      <button onclick={handleClear}       disabled={!canSetClear}>Clear activity</button>
-    </div>
-  </section>
+    <EventLog />
+  </div>
 </main>
-
-<style>
-  main {
-    max-width: 540px;
-    margin: 0 auto;
-    padding: 2rem 1.5rem;
-  }
-
-  h1 { text-align: center; margin-bottom: 1.5rem; }
-  h2 { margin: 0 0 .75rem; font-size: 1rem; text-transform: uppercase; letter-spacing: .05em; opacity: .6; }
-  h3 { margin: 1rem 0 .4rem; font-size: .9rem; }
-
-  section {
-    background: rgba(255,255,255,.06);
-    border: 1px solid rgba(255,255,255,.1);
-    border-radius: 10px;
-    padding: 1.2rem 1.4rem;
-    margin-bottom: 1.2rem;
-  }
-
-  .status-bar {
-    display: flex;
-    align-items: center;
-    gap: .5rem;
-    margin-bottom: 1.2rem;
-    font-size: .9rem;
-    opacity: .85;
-  }
-  .dot {
-    width: 9px; height: 9px;
-    border-radius: 50%;
-    background: #555;
-    flex-shrink: 0;
-  }
-  .dot.green  { background: #3ba55d; }
-  .dot.yellow { background: #faa61a; }
-  .dot.red    { background: #ed4245; }
-  .sep { opacity: .4; }
-  .msg { opacity: .7; }
-
-  .row { display: flex; gap: .6rem; flex-wrap: wrap; }
-
-  button { flex-shrink: 0; }
-  button.accent  { background: #5865f2; color: #fff; border-color: transparent; }
-  button.danger  { background: #ed4245; color: #fff; border-color: transparent; }
-  button:disabled { opacity: .35; cursor: not-allowed; }
-
-  label {
-    display: flex;
-    flex-direction: column;
-    gap: .25rem;
-    font-size: .85rem;
-    font-weight: 600;
-    margin-bottom: .75rem;
-  }
-
-  .checkbox-label { flex-direction: row; align-items: center; gap: .5rem; }
-  .checkbox-label input { width: auto; }
-
-  input[type="text"],
-  input[type="url"] { width: 100%; box-sizing: border-box; }
-
-  .btn-row { display: flex; align-items: center; gap: .5rem; margin-bottom: .5rem; }
-  .btn-num { font-size: .75rem; opacity: .4; width: 14px; text-align: center; flex-shrink: 0; }
-  .btn-row input[type="text"] { flex: 1; min-width: 0; }
-  .btn-row input[type="url"]  { flex: 2; min-width: 0; }
-
-  .hint { font-size: .8rem; opacity: .5; margin: .6rem 0 0; }
-  .hint-inline { font-size: .75rem; opacity: .55; font-weight: 400; }
-</style>
